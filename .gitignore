@@ -1,4 +1,8 @@
 # Python
+.env
+.env.*
+!.env.example
+deployment-state.json
 __pycache__/
 *.py[cod]
 *$py.class
@@ -28,6 +32,7 @@ ENV/
 env.bak/
 venv.bak/
 .venv/
+.venv-ui/
 
 # PyInstaller
 *.manifest
@@ -73,3 +78,14 @@ dmypy.json
 
 # Profiling
 .prof
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# Cloudflare worker artifacts
+deploy/matses-voice/worker/node_modules/
+deploy/matses-voice/worker/.wrangler/
+deploy/matses-voice/worker/.cloudflare/
+deploy/matses-voice/.cloudflare/
+deploy/matses-voice/plan/
+docs/superpowers/
