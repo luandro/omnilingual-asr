@@ -1,0 +1,12 @@
+{
+  "name": "luandrodd-omnilingual-asr",
+  "image": "docker.io/luandrodd/omnilingual-asr:runpod-ctc-1b-v1",
+  "type": "QUEUE",
+  "gpu": {"pools": ["AMPERE_16"], "count": 1, "minCudaVersion": "12.6"},
+  "workers": {"min": 0, "max": 1, "idleTimeout": 5},
+  "scaling": {"type": "QUEUE_DELAY", "queueDelay": 4},
+  "timeout": 600000,
+  "disk": 30,
+  "flashboot": "FLASHBOOT",
+  "env": {"MODEL_CARD": "omniASR_CTC_1B_v2"}
+}

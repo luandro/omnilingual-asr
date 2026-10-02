@@ -1,0 +1,41 @@
+{
+  "catalog_version": 1,
+  "generated_by": "scripts/build_language_catalog.py",
+  "retrieved_date": "2026-09-29",
+  "catalog_sha256": "7ecde01559860603e568fb73b42e41803564d2ea3c23516a73f43897bac29e4d",
+  "asr_supported_tokens": {
+    "source": "src/omnilingual_asr/models/wav2vec2_llama/lang_ids.py",
+    "revision": "81f51e224ce9e74b02cc2a3eaf21b2d91d743455",
+    "sha256": "675b8a263aed48269020d4e9f06b3063d5b4e0d5399b2c3e0e06160e08d24f8e"
+  },
+  "glottolog": {
+    "citation": "Hammarström, Harald; Forkel, Robert; Haspelmath, Martin; Bank, Sebastian. 2026. Glottolog 5.3. Leipzig: Max Planck Institute for Evolutionary Anthropology.",
+    "url": "https://raw.githubusercontent.com/glottolog/glottolog-cldf/072ca0d0410039fb8b779be8fc165bac575d2cda/cldf/languages.csv",
+    "revision": "072ca0d0410039fb8b779be8fc165bac575d2cda",
+    "release": "5.3",
+    "cldf_revision_dataset_label": "CLDF snapshot v5.2.1 derived from Glottolog v5.3",
+    "license": "CC BY 4.0",
+    "sha256": "1a50a393bc81568b656f9522be18aa4f80f38e94309ba6c863d583234adfbb89",
+    "local_name_override": {
+      "mcf": "Matsés"
+    }
+  },
+  "map_outline": {
+    "source": "Natural Earth 1:110m land polygons",
+    "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_110m_land.geojson",
+    "revision": "ca96624a56bd078437bca8184e78163e5039ad19",
+    "license": "Public domain",
+    "sha256": "9e0729ee253ca7d7a5c4ae9395fb1902264c5377c52e224d13dd85010e2835d9"
+  },
+  "coverage": {
+    "supported_tokens": 1672,
+    "matched_tokens": 1635,
+    "ambiguous_tokens": 0,
+    "unmatched_tokens": 36,
+    "without_location_tokens": 1,
+    "invalid_location_tokens": 0,
+    "exact_matches": 1636,
+    "missing_names": 36,
+    "missing_locations": 37
+  }
+}

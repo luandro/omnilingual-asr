@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+.venv
+.venv-ui
+__pycache__
+graft
+deployment-state.json
+deploy/matses-voice

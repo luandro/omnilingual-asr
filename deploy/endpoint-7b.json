@@ -1,0 +1,17 @@
+{
+  "name": "luandrodd-omnilingual-asr-llm-7b-v2",
+  "image": "pytorch/pytorch@sha256:dab81780fd94483b67b4b5679cc0024939b08e48540d39476d284cb29002ed69",
+  "type": "QUEUE",
+  "gpu": {
+    "pools": ["AMPERE_24"],
+    "excludedTypes": ["NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb"],
+    "count": 1,
+    "minCudaVersion": "12.6"
+  },
+  "workers": {"min": 0, "max": 1, "idleTimeout": 5},
+  "scaling": {"type": "QUEUE_DELAY", "queueDelay": 4},
+  "timeout": 600000,
+  "disk": 100,
+  "flashboot": "FLASHBOOT",
+  "env": {"MODEL_CARD": "omniASR_LLM_7B_v2"}
+}

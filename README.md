@@ -25,6 +25,9 @@ We release two suites of models:
 
 ## Documentation
 
+- **[Runpod Serverless + local Gradio](deploy/README.md)** — Remote GPU inference with a local audio upload and recording app.
+- **[Language-map research](docs/language-map-research.md)** — Language names, globe coordinates, source provenance, and a proposed cross-source catalog for a future map interface.
+
 ### Quick Start
 - **[Installation & Basic Usage](#installation)** - Setup and first transcription
 - **[Inference Pipeline](src/omnilingual_asr/models/inference/README.md)** - Comprehensive transcription guide with batch processing, language conditioning, and context examples
