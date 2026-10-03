@@ -83,6 +83,13 @@ http.createServer((req, res) => {
       if (typeof p.job_id !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(p.job_id)) return bad();
       if (typeof p.client_id !== "string" || p.client_id.length < 8) return bad();
       if (typeof p.transcript !== "string" || !p.transcript || p.transcript.length > 4000) return bad();
+      if (p.verdict === "correct") {
+        // FalhaRun: synthetic value forcing the 500 path (documented in README)
+  if (p.correction === "FalhaRun") return done(500, { error: "Erro do servidor." });
+        if (seen.has(p.client_id)) return done(200, { ok: true, duplicate: true });
+        seen.add(p.client_id);
+        return done(200, { ok: true });
+      }
       const ix = p.word_indexes;
       if (!Array.isArray(ix) || !ix.length || ix.length > 1000) return bad();
       if (!ix.every((n) => Number.isInteger(n) && n >= 0 && n < 1000)) return bad();
@@ -93,7 +100,8 @@ http.createServer((req, res) => {
       if (typeof p.original !== "string" || p.original !== toks.slice(ix[0], ix[ix.length - 1] + 1).join(" ")) return bad();
       if (typeof p.correction !== "string" || !p.correction.trim() || p.correction.length > 200) return bad();
       if (p.correction.trim() === p.original) return bad();
-      if (p.correction === "FalhaRun") return done(500, { error: "Erro do servidor." });
+      // FalhaRun: synthetic value forcing the 500 path (documented in README)
+  if (p.correction === "FalhaRun") return done(500, { error: "Erro do servidor." });
       if (seen.has(p.client_id)) return done(200, { ok: true, duplicate: true });
       seen.add(p.client_id || String(Math.random()));
       return done(200, { ok: true });
@@ -101,7 +109,9 @@ http.createServer((req, res) => {
     return;
   }
 
-  const m = path.match(/^\/status\/([A-Za-z0-9-]{8,64})$/);
+  const m2 = path.match(/^\/status\/[a-z][a-z0-9]{1,7}\/([A-Za-z0-9-]{8,64})$/);
+  const path2 = m2 ? "/status/" + m2[1] : path;
+  const m = path2.match(/^\/status\/([A-Za-z0-9-]{8,64})$/);
   if (m) {
     if (req.method !== "GET") return done(405, { error: "Method not allowed" });
     const id = m[1];
