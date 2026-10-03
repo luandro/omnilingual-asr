@@ -89,3 +89,7 @@ deploy/matses-voice/worker/.cloudflare/
 deploy/matses-voice/.cloudflare/
 deploy/matses-voice/plan/
 docs/superpowers/
+
+# Generated build artifacts
+page/mcf/fresh-*.html
+deploy/matses-voice/page/mcf/fresh-*.html

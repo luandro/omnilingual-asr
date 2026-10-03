@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://matses-asr-proxy.mangadl.workers.dev http://127.0.0.1:8999 http://localhost:8999; media-src blob:">
+<title>Gravador Matsés</title>
+<style>
+:root { color-scheme: light; --bg:#faf7f2; --ink:#26201a; --muted:#877b6c; --line:#eae2d5; --brand:#1a5fb4; --rec:#c01c28; --ok:#1a7f37; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+main { width: min(480px, calc(100vw - 32px)); text-align: center; padding: 24px 0; }
+.lang { font-size: 13px; color: var(--muted); margin: 0 0 20px; }
+button { font: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
+.big {
+  width: min(64vmin, 260px);
+  height: min(64vmin, 260px);
+  border-radius: 50%;
+  border: none;
+  background: var(--brand);
+  font-size: 64px;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 24px rgba(26,95,180,.35);
+}
+.big.stop { background: var(--rec); box-shadow: 0 6px 24px rgba(192,28,40,.35); animation: pulse 1.6s ease-in-out infinite; }
+.big:active { transform: scale(.97); }
+.hint { color: var(--muted); margin: 18px 0 0; font-size: 15px; }
+.timer { font-size: 34px; font-variant-numeric: tabular-nums; margin: 14px 0 0; }
+.spinner {
+  width: 72px; height: 72px; margin: 0 auto;
+  border: 7px solid var(--line);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 1.4s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { box-shadow: 0 6px 24px rgba(192,28,40,.35), 0 0 0 26px rgba(192,28,40,.12); } }
+@media (prefers-reduced-motion: reduce) { .big.stop, .spinner { animation: none; } }
+.transcript {
+  font-size: 24px; line-height: 1.5; user-select: all; -webkit-user-select: all; cursor: pointer;
+  background: #fffdf9; border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px; text-align: left; overflow-wrap: break-word;
+}
+.primary {
+  background: var(--brand); color: #fff; border: none;
+  border-radius: 999px; padding: 14px 42px; font-size: 18px;
+  margin-top: 22px;
+}
+.ghost {
+  background: none; border: none; color: var(--muted);
+  font-size: 14px; margin-top: 18px; text-decoration: underline;
+}
+.jobid { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; margin: 12px 0 0; overflow-wrap: anywhere; }
+.errtext { font-size: 17px; line-height: 1.5; }
+.w {
+  font: inherit; color: var(--ink); background: transparent; border: none; margin: 0;
+  display: inline; border-radius: 4px; padding: 2px 0; white-space: pre;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  -webkit-tap-highlight-color: transparent;
+}
+.w.alt { background: #f3eadb; }
+.w[aria-pressed="true"] { background: var(--brand); color: #fff; }
+.tok { display: inline; white-space: pre; }
+.transcript.chips { user-select: none; -webkit-user-select: none; cursor: default; text-align: left; }
+#fbbar { margin-top: 16px; text-align: left; }
+.fbword { font-size: 14px; color: var(--muted); margin: 0 0 6px; }
+.fbprivacy { font-size: 13px; color: var(--muted); margin: 0 0 10px; line-height: 1.4; }
+#fbform { display: flex; gap: 8px; align-items: center; }
+#fbinput {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: #fffdf9; color: var(--ink);
+}
+.fbsend { padding: 10px 22px; min-height: 44px; margin-top: 0; }
+.fbcancel { margin-top: 0; font-size: 14px; padding: 10px 8px; min-height: 44px; }
+.fberr { color: var(--rec); font-size: 14px; margin: 10px 0 0; }
+.fbstatus { color: var(--brand); font-size: 15px; margin: 14px 0 0; }
+/* fixed-frame layout: absorb height deltas in the spacer */
+main {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+}
+main > section { margin-block: auto; }
+#result { margin-block: 0; flex: 1 0 auto; }
+#result:not([hidden]) { display: flex; flex-direction: column; }
+#result h1 { margin: 0 0 20px; }
+.transcript { margin: 0; }
+#copybtn, #restart { align-self: center; }
+.spacer { flex: 1 1 0; min-height: 16px; }
+#fberr[hidden] { display: block; visibility: hidden; }
+.actionsrow { display:flex; gap:10px; justify-content:center; margin:14px 0 0; }
+.actbtn { display:inline-flex; align-items:center; gap:6px; }
+.actbtn svg { flex: none; }
+.confirmwrap { display:flex; justify-content:center; margin:16px 0 0; }
+.confirm { width:76px; height:76px; border-radius:50%; border:2.5px solid var(--ok); background:transparent; color:var(--ok); display:inline-flex; align-items:center; justify-content:center; }
+.confirm:disabled { opacity:0.5; }
+.confirm-done { width:76px; height:76px; border-radius:50%; background:var(--ok); color:#fff; display:inline-flex; align-items:center; justify-content:center; }
+.confirm[hidden], .confirm-done[hidden] { display:none; }
+</style>
+</head>
+<body>
+<main>
+  <p class="lang">Matsés · omniASR_LLM_7B_v2</p>
+  <section id="idle">
+    <button id="rec" class="big" aria-label="Gravar áudio"><svg viewBox="0 0 24 24" width="96" height="96" fill="currentColor" aria-hidden="true"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"/></svg></button>
+    <p class="hint">Toque para gravar</p>
+    <p class="hint fbprivacy">Suas gravações de áudio, textos e correções são guardadas para melhorar o modelo.</p>
+  </section>
+  <section id="recording" hidden>
+    <button id="stop" class="big stop" aria-label="Parar gravação">■</button>
+    <p class="timer" id="timer">0:00</p>
+    <p class="hint">Gravando — para automaticamente em 3:00</p>
+  </section>
+  <section id="loading" hidden>
+    <div class="spinner" role="status" aria-label="Transcrevendo"></div>
+    <p class="timer" id="loadtimer">0:00</p>
+    <p class="hint">Transcrevendo — pode levar alguns minutos, pode ficar tranquilo</p>
+    <p class="jobid" id="loadjob"></p>
+    <button id="cancel" class="ghost">Cancelar</button>
+  </section>
+  <section id="result" hidden>
+    <h1>Transcrição</h1>
+  <p class="transcript chips" id="text" aria-label="Transcrição"></p>
+  <p class="hint" id="texthint">Toque na primeira e na última palavra do trecho errado</p>
+  <div class="actionsrow" id="actionsrow" hidden>
+    <button id="copybtn" class="ghost actbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copiar texto</button>
+    <button id="sharebtn" class="ghost actbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Compartilhar</button>
+  </div>
+  <div class="confirmwrap" id="confirmwrap">
+    <button id="confirmbtn" class="confirm" aria-label="Está correto"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></button>
+      <span class="confirm-done" id="confirmdone" hidden role="status"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>
+  </div>
+  <div class="spacer" aria-hidden="true"></div>
+  <div id="fbbar" hidden>
+    <p class="fbword" id="fbword"></p>
+    <p class="fbprivacy">Para melhorar o modelo, guardamos o áudio, o texto transcrito e as correções.</p>
+    <form id="fbform">
+      <input id="fbinput" type="text" autocomplete="off" enterkeyhint="send" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Escreva a forma certa" aria-label="Correção">
+      <button type="submit" id="fbsend" class="primary fbsend" disabled>Enviar</button>
+      <button type="button" id="fbcancel" class="ghost fbcancel">Cancelar</button>
+    </form>
+    <p class="fberr" id="fberr" role="status" hidden></p>
+  </div>
+  <p class="fbstatus" id="fbstatus" role="status" hidden></p>
+    <p class="jobid" id="donejob"></p>
+    <button id="restart" class="primary">Novo</button>
+  </section>
+  <section id="error" hidden>
+    <p class="errtext" id="errmsg"></p>
+    <p class="jobid" id="errjob"></p>
+    <button id="retry" class="primary">Tentar de novo</button>
+  </section>
+</main>
+<script>
+(() => {
+"use strict";
+const CONFIG_WORKER_URL = "https://matses-asr-proxy.mangadl.workers.dev";
+const params = new URLSearchParams(location.search);
+const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
+const WORKER_URL = (LOCAL && params.get("worker") ? params.get("worker") : CONFIG_WORKER_URL).replace(/\/+$/, "");
+const PROFILE = "mcf";
+const MAX_SECONDS = Number(params.get("maxSec")) || 180;
+const POLL_MS = 3000;
+const POLL_DEADLINE_MS = 20 * 60 * 1000;
+const $ = (id) => document.getElementById(id);
+const STATES = ["idle", "recording", "loading", "result", "error"];
+function show(name) { for (const s of STATES) $(s).hidden = (s !== name); }
+let recorder = null, chunks = [], stream = null, busy = false;
+let autoStop = null, tick = null, seconds = 0;
+let pollTimer = null, jobDeadline = 0, jobId = null, pollGen = 0, pollFails = 0;
+let loadTick = null;
+function fmt(s) { const n = Math.floor(s); return Math.floor(n / 60) + ":" + String(n % 60).padStart(2, "0"); }
+function cleanupMic() {
+  if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
+}
+function fail(msg, job) {
+  clearInterval(loadTick);
+  busy = false;
+  show("error");
+  $("errmsg").textContent = msg;
+  $("errjob").textContent = job ? "ID " + job : "";
+}
+function startRecording() {
+  if (busy) return;
+  busy = true;
+  if (!WORKER_URL) { fail("Servidor não configurado. Use ?worker= ou edite CONFIG_WORKER_URL."); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    fail("Este navegador não suporta gravação. Use iOS 14.3+ ou navegador atual.");
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => {
+    stream = s;
+    const mimes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", ""];
+    const mime = mimes.find((m) => m === "" || MediaRecorder.isTypeSupported(m));
+    chunks = [];
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    recorder.onstop = processRecording;
+    recorder.onerror = () => { cleanupMic(); fail("Falha na gravação."); };
+    recorder.start(1000);
+    seconds = 0;
+    $("timer").textContent = "0:00";
+    show("recording");
+    tick = setInterval(() => { seconds += 1; $("timer").textContent = fmt(seconds); }, 1000);
+    autoStop = setTimeout(stopRecording, MAX_SECONDS * 1000);
+  }).catch(() => {
+    fail("Acesso ao microfone negado. Libere o microfone e tente de novo.");
+  });
+}
+function stopRecording() {
+  clearInterval(tick); clearTimeout(autoStop);
+  if (recorder && recorder.state === "recording") recorder.stop();
+}
+$("rec").addEventListener("click", startRecording);
+$("stop").addEventListener("click", stopRecording);
+async function processRecording() {
+  cleanupMic();
+  const gen = pollGen;
+  show("loading");
+  $("loadtimer").textContent = "0:00";
+  try {
+    const blob = new Blob(chunks, { type: (recorder && recorder.mimeType) || "audio/webm" });
+    if (!blob.size) throw new Error("Nada foi gravado. Tente de novo.");
+    const buf = await blob.arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let decoded;
+    try {
+      decoded = await ctx.decodeAudioData(buf);
+    } finally {
+      ctx.close();
+    }
+    if (decoded.duration < 0.3) throw new Error("Gravação muito curta. Grave de novo.");
+    if (decoded.duration > MAX_SECONDS + 1) throw new Error("Gravação muito longa.");
+    const offline = new OfflineAudioContext(1, Math.ceil(decoded.length * 16000 / decoded.sampleRate), 16000);
+    const src = offline.createBufferSource();
+    src.buffer = decoded;
+    src.connect(offline.destination);
+    src.start();
+    const rendered = await offline.startRendering();
+    const samples = rendered.getChannelData(0);
+    const wav = encodeWav(samples, 16000);
+    const b64 = bytesToBase64(new Uint8Array(wav));
+    $("loadjob").textContent = "";
+    const resp = await fetch(WORKER_URL + "/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audio_base64: b64, profile: PROFILE }),
+    });
+    if (!resp.ok) {
+      let m = "Falha no envio (" + resp.status + ")";
+      if (resp.status === 429) m = "Muitas tentativas. Aguarde alguns minutos.";
+      try { const j = await resp.json(); if (j.error) m = j.error; } catch (e) {}
+      throw new Error(m);
+    }
+    const job = await resp.json();
+    if (gen !== pollGen) return;
+    if (!job.id) throw new Error("Servidor não retornou ID do job.");
+    setJobId(job.id);
+    jobDeadline = Date.now() + POLL_DEADLINE_MS;
+    pollLoop();
+  } catch (e) {
+    if (gen !== pollGen) return;
+    fail(e && e.message ? e.message : "Erro inesperado.");
+  }
+}
+function setJobId(id) {
+  if (!id) return;
+  jobId = id;
+  $("loadjob").textContent = "ID " + id;
+}
+function pollLoop() {
+  if (Date.now() > jobDeadline) {
+    fail("Tempo esgotado. Tente de novo.", jobId);
+    return;
+  }
+  clearInterval(loadTick);
+  const loadStart = Date.now();
+  loadTick = setInterval(() => {
+    const s = Math.floor((Date.now() - loadStart) / 1000);
+    $("loadtimer").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }, 1000);
+  const gen = pollGen;
+  pollTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch(WORKER_URL + "/status/" + PROFILE + "/" + jobId, { cache: "no-store" });
+      if (gen !== pollGen) return;
+      if (!resp.ok) throw new Error("status " + resp.status);
+      const job = await resp.json();
+      if (gen !== pollGen) return;
+      pollFails = 0;
+      if (job.status === "COMPLETED") {
+        clearInterval(loadTick);
+        currentTranscript = job.text || "";
+        if (currentTranscript) {
+          renderChips(currentTranscript);
+          cfReset();
+        } else {
+          $("text").textContent = "(nenhum texto reconhecido)";
+          $("texthint").hidden = true;
+          $("copybtn").hidden = true;
+          $("sharebtn").hidden = true;
+          cfReset();
+        }
+        $("donejob").textContent = "ID " + jobId;
+        show("result");
+        return;
+      }
+      if (job.error) {
+        fail(job.error, jobId);
+        return;
+      }
+      pollLoop();
+    } catch (e) {
+      if (gen !== pollGen) return;
+      pollFails += 1;
+      if (pollFails >= 5) { fail("Sem conexão com o servidor. Tente de novo.", jobId); return; }
+      pollLoop();
+    }
+  }, POLL_MS);
+}
+let fbLo = -1, fbHi = -1, fbAnchored = false, fbGen = 0, fbClientId = null, currentTranscript = "";
+let fbAnchorEl = null;
+let tokens = [];
+let displayTokens = [];
+let fbPending = false;
+const DUMMY_TEXT = "Uwesh Fruqui matud paëmba";
+function hasLetter(t) { return /[\p{L}\p{N}]/u.test(t); }
+function fbClear(focusEl) {
+  fbLo = -1; fbHi = -1; fbAnchored = false; fbClientId = null;
+  fbAnchorEl = null;
+  document.querySelectorAll(".w[aria-pressed=" + '"' + "true" + '"]').forEach((c) => c.setAttribute("aria-pressed", "false"));
+  $("fbbar").hidden = true;
+  if (focusEl && focusEl.isConnected) focusEl.focus();
+}
+function fbItems() { return Array.from(document.querySelectorAll("#text .w")); }
+function fbShowBar() {
+  const words = tokens.slice(fbLo, fbHi + 1).join(" ");
+  $("fbword").textContent = fbAnchored ? "Primeira palavra: " + words : "Palavras: " + words;
+  $("fbinput").placeholder = fbLo === fbHi ? "Escreva a forma certa" : "Escreva a frase certa";
+  $("fberr").hidden = true;
+  $("fbsend").disabled = true;
+  $("fbinput").value = "";
+  $("actionsrow").hidden = true;
+  $("fbbar").hidden = false;
+}
+function renderChips(text) {
+  const box = $("text");
+  box.textContent = "";
+  fbClear();
+  fbPending = false;
+  $("fbstatus").hidden = true;
+  $("fbstatus").textContent = "";
+  tokens = text.split(/\s+/).filter(Boolean);
+  displayTokens = tokens.slice();
+  tokens.forEach((tok, i) => {
+    const s = document.createElement("span");
+    s.className = "tok";
+    s.dataset.a = String(i);
+    s.dataset.b = String(i);
+    if (hasLetter(tok)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "w" + (i % 2 === 1 ? " alt" : "");
+      b.lang = "mcf";
+      b.textContent = tok + " ";
+      b.dataset.a = String(i);
+      b.dataset.b = String(i);
+      b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", () => fbTap(b));
+      s.appendChild(b);
+    } else {
+      s.textContent = tok + " ";
+    }
+    box.appendChild(s);
+  });
+  fbPending = false;
+  $("fbcancel").disabled = false;
+  $("fbinput").disabled = false;
+  $("fbsend").textContent = "Enviar";
+  $("fbsend").disabled = true;
+const any = tokens.some(hasLetter);
+  $("texthint").hidden = !any;
+  $("copybtn").hidden = !any;
+}
+function fbTap(chip) {
+  if (fbPending) return;
+  const a = Number(chip.dataset.a);
+  const b = Number(chip.dataset.b);
+  if (fbAnchored) {
+    const lo = Math.min(fbLo, fbHi);
+    const hi = Math.max(fbLo, fbHi);
+    if (a <= hi && b >= lo) { fbClear(chip); return; }
+    fbLo = Math.min(a, lo);
+    fbHi = Math.max(b, hi);
+    fbAnchored = false;
+    fbMarkRange();
+    fbShowBar();
+    return;
+  }
+  fbLo = a;
+  fbHi = b;
+  fbAnchored = true;
+  fbAnchorEl = chip;
+  fbClientId = crypto.randomUUID();
+  fbMarkRange();
+  fbShowBar();
+}
+function fbMarkRange() {
+  const lo = fbLo;
+  const hi = fbHi;
+  fbItems().forEach((el) => {
+    const x = Number(el.dataset.a);
+    const y = Number(el.dataset.b);
+    el.setAttribute("aria-pressed", x <= hi && y >= lo ? "true" : "false");
+  });
+}
+function fallbackCopy(t, done) {
+  const ta = document.createElement("textarea");
+  ta.value = t;
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); done(); } catch (e) {}
+  ta.remove();
+}
+$("copybtn").addEventListener("click", () => {
+  const t = displayTokens.filter((x) => x !== null).join(" ").trim();
+  const done = () => {
+    $("copybtn").textContent = "Copiado!";
+    setTimeout(() => { $("copybtn").textContent = "Copiar texto"; }, 2000);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(done).catch(() => fallbackCopy(t, done));
+  } else {
+    fallbackCopy(t, done);
+  }
+});
+
+// Confirm + share actions for the result screen.
+let cfPending = false, cfId = null, confirmed = false, cfGen = 0;
+const CONFIRM_HTML = document.getElementById("confirmbtn").innerHTML;
+function cfReset() { cfGen += 1; cfId = null; cfPending = false; confirmed = false; const btn = $("confirmbtn"); btn.disabled = false; btn.removeAttribute("aria-busy"); btn.innerHTML = CONFIRM_HTML; btn.hidden = false; $("confirmdone").hidden = true; updateActionsRow(); }
+function resultReset() { currentTranscript = ""; displayTokens = []; $("text").innerHTML = ""; $("texthint").hidden = true; $("fbstatus").hidden = true; }
+function updateActionsRow() {
+  const show = !!currentTranscript;
+  $("actionsrow").hidden = !show;
+  $("copybtn").hidden = !show;
+  $("texthint").hidden = !show;
+  $("confirmwrap").hidden = !show || confirmed;
+  $("sharebtn").hidden = !show;
+}
+
+$("confirmbtn").addEventListener("click", async () => {
+  if (cfPending || !currentTranscript || confirmed) return;
+  const gen = ++cfGen;
+  if (!cfId) cfId = crypto.randomUUID();
+  cfPending = true;
+  const btn = $("confirmbtn");
+  btn.disabled = true;
+  btn.setAttribute("aria-busy", "true");
+  try {
+    const resp = await fetch(WORKER_URL + "/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        verdict: "correct",
+        profile: PROFILE,
+        job_id: jobId,
+        client_id: cfId,
+        transcript: currentTranscript,
+      }),
+    });
+    if (!resp.ok) throw new Error("status " + resp.status);
+    if (gen !== cfGen) return;
+    confirmed = true;
+    $("confirmbtn").hidden = true;
+    $("confirmdone").hidden = false;
+    $("fbstatus").textContent = "Obrigado! Confirmação enviada.";
+    $("fbstatus").hidden = false;
+    updateActionsRow();
+  } catch (e) {
+    if (gen !== cfGen) return;
+    cfPending = false;
+    btn.disabled = false;
+    btn.removeAttribute("aria-busy");
+    btn.innerHTML = CONFIRM_HTML;
+    $("fbstatus").textContent = "Não foi possível enviar. Verifique a internet e toque em Enviar de novo.";
+    $("fbstatus").hidden = false;
+  }
+});
+
+async function shareText() {
+  const txt = (displayTokens || []).filter(Boolean).join(" ").trim() || currentTranscript;
+  if (navigator.share) {
+    try { await navigator.share({ text: txt }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  window.open("https://wa.me/?text=" + encodeURIComponent(txt), "_blank", "noopener");
+}
+$("sharebtn").addEventListener("click", shareText);
+
+$("fbinput").addEventListener("input", () => {
+  $("fbsend").disabled = fbPending || !$("fbinput").value.trim();
+});
+$("fbcancel").addEventListener("click", () => {
+  if (fbPending) return;
+  fbClear(fbAnchorEl);
+});
+$("fbform").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (fbPending || fbLo < 0) return;
+  const correction = $("fbinput").value.trim();
+  if (!correction) return;
+  const a = fbLo;
+  const b = fbHi;
+  const gen = fbGen;
+  const payload = {
+    job_id: jobId,
+    client_id: fbClientId,
+    profile: PROFILE,
+    transcript: currentTranscript,
+    word_indexes: Array.from({ length: b - a + 1 }, (_, k) => a + k),
+    word_index: a,
+    original: tokens.slice(a, b + 1).join(" "),
+    correction: correction,
+  };
+  fbPending = true;
+  $("fbsend").disabled = true;
+  $("fbcancel").disabled = true;
+  $("fbinput").disabled = true;
+  $("fbsend").textContent = "Enviando...";
+  $("fberr").hidden = true;
+  fetch(WORKER_URL + "/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(async (resp) => {
+    if (gen !== fbGen) return;
+    if (!resp.ok) throw new Error("status " + resp.status);
+    const nb = fbApplyCorrection(a, b, correction);
+    fbClear(nb);
+    $("fbinput").value = "";
+    $("fbstatus").textContent = "Obrigado! Sua correção foi enviada.";
+    $("fbstatus").hidden = false;
+  }).catch(() => {
+    if (gen !== fbGen) return;
+$("fberr").textContent = "Não foi possível enviar. Verifique a internet e toque em Enviar de novo.";
+    $("fberr").hidden = false;
+  }).finally(() => {
+    if (gen !== fbGen) return;
+    fbPending = false;
+    $("fbcancel").disabled = false;
+    $("fbinput").disabled = false;
+    $("fbsend").textContent = "Enviar";
+    $("fbsend").disabled = !$("fbinput").value.trim();
+  });
+});
+function fbApplyCorrection(a, b, correction) {
+  const nb = document.createElement("button");
+  nb.type = "button";
+  nb.className = "w";
+  nb.lang = "mcf";
+  nb.textContent = correction + " ";
+  nb.dataset.a = String(a);
+  nb.dataset.b = String(b);
+  nb.setAttribute("aria-pressed", "false");
+  nb.addEventListener("click", () => fbTap(nb));
+  let placed = null;
+  Array.from($("text").children).forEach((wrap) => {
+    const x = Number(wrap.dataset.a);
+    const y = Number(wrap.dataset.b);
+    if (Number.isNaN(x) || x > b || y < a) return;
+    if (placed === null) {
+      placed = wrap;
+      wrap.textContent = "";
+      wrap.appendChild(nb);
+    } else {
+      wrap.textContent = "";
+    }
+  });
+  if (placed === null) return null;
+  displayTokens[a] = correction;
+  for (let k = a + 1; k <= b; k++) displayTokens[k] = null;
+  return nb;
+}
+const TEST_MODE = LOCAL && params.get("test") === "1";
+if (TEST_MODE) {
+  jobId = "test-local-0001";
+  currentTranscript = DUMMY_TEXT;
+  $("donejob").textContent = "ID " + jobId;
+  renderChips(DUMMY_TEXT);
+  cfReset();
+  show("result");
+}
+function encodeWav(samples, rate) {
+  const n = samples.length;
+  const bytes = n * 2 + 44;
+  const buf = new ArrayBuffer(bytes);
+  const v = new DataView(buf);
+  const wstr = (off, s) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  wstr(0, "RIFF"); v.setUint32(4, bytes - 8, true);
+  wstr(8, "WAVE"); wstr(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  wstr(36, "data"); v.setUint32(40, bytes - 44, true);
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return buf;
+}
+function bytesToBase64(bytes) {
+  let binary = "";
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  }
+  return btoa(binary);
+}
+$("cancel").addEventListener("click", () => {
+  pollGen += 1; pollFails = 0; clearTimeout(pollTimer); busy = false; show("idle");
+});
+$("restart").addEventListener("click", () => { pollGen += 1; fbGen += 1; pollFails = 0; busy = false; jobId = null; resultReset(); show("idle"); });
+$("retry").addEventListener("click", () => { pollGen += 1; fbGen += 1; pollFails = 0; busy = false; jobId = null; resultReset(); show("idle"); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && recorder && recorder.state === "recording") stopRecording();
+});
+})();
+</script>
+</body>
+</html>
