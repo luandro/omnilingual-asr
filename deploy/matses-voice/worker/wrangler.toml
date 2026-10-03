@@ -6,3 +6,7 @@ compatibility_date = "2026-09-01"
 binding = "DB"
 database_name = "matses-feedback"
 database_id = "2d9fe8dc-78f0-4dc0-ae43-db18ac7f2035"
+
+[[r2_buckets]]
+binding = "AUDIO"
+bucket_name = "matses-audio"

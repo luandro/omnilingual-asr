@@ -1,0 +1,2 @@
+ALTER TABLE feedback ADD COLUMN profile TEXT NOT NULL DEFAULT 'mcf';
+ALTER TABLE feedback ADD COLUMN verdict TEXT NOT NULL DEFAULT 'correction';
