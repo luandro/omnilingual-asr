@@ -83,6 +83,28 @@ python3 -m http.server 8000 --directory page    # page on 127.0.0.1:8000
 - Correction `FalhaRun` forces a 500 to test the error state.
 - `?worker=` and `?test=1` only work on localhost.
 
+The mock's `/status` behavior is selected with `MOCK_SCENARIO` when starting it:
+
+| Scenario | Behavior |
+| --- | --- |
+| `standard` (default) | 2x `IN_PROGRESS` (with `delayTime`), then `COMPLETED` |
+| `queue` | 3x `IN_QUEUE`, 2x `IN_PROGRESS` (`delayTime` 45000), then `COMPLETED` |
+| `immediate` | first status poll `COMPLETED` (warm worker) |
+| `noerror` | first status poll `FAILED` with no `error` field |
+
+## Automated tests
+
+```sh
+node --test "test/*.test.mjs"   # worker status shaping + loading-timer/stage behavior
+```
+
+- `test/worker-status.test.mjs` — Worker `/status` response mapping
+  (`delayTime` validation, model-identity check, terminal statuses).
+- `test/loading-state.test.mjs` — drives each page's inline script in a vm
+  sandbox with a fake clock; asserts the loading-seconds counter accumulates
+  across polls, stage messages render, transient poll failures recover, and
+  cancel/failure stop the timer.
+
 ## Pull training labels
 
 ```sh

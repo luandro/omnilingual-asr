@@ -1,8 +1,17 @@
 // Minimal stand-in for the Cloudflare Worker: emulates /run, /status/:id, /health
 // with scripted states so the page can be tested without touching RunPod.
+//
+// Scenario selector: set MOCK_SCENARIO in the environment when starting.
+//   standard (default) 2x IN_PROGRESS (with delayTime) then COMPLETED
+//   queue              3x IN_QUEUE, 2x IN_PROGRESS (delayTime 45000), then COMPLETED
+//   immediate          first status poll COMPLETED (warm worker)
+//   noerror            first status poll FAILED with no error field
+// The scripted-failure job (POST /run body {"fail": true}) is independent of
+// the scenario and always fails on the first status poll.
 import http from "node:http";
 
 const PORT = 8999;
+const SCENARIO = process.env.MOCK_SCENARIO || "standard";
 const jobs = new Map();
 const seen = new Set();
 let counter = 0;
@@ -119,8 +128,15 @@ http.createServer((req, res) => {
     if (!job) return done(404, { error: "Unknown job" });
     job.polls += 1;
     if (id === "mockjobfail0001") return done(200, { status: "FAILED", error: "scripted failure" });
+    if (SCENARIO === "noerror") return done(200, { status: "FAILED" });
+    if (SCENARIO === "immediate") return done(200, { status: "COMPLETED", text: "Uwesh Fruqui matud (mock transcription)" });
+    if (SCENARIO === "queue") {
+      if (job.polls <= 3) return done(200, { status: "IN_QUEUE" });
+      if (job.polls <= 5) return done(200, { status: "IN_PROGRESS", delayTime: 45000 });
+      return done(200, { status: "COMPLETED", text: "Uwesh Fruqui matud (mock transcription)" });
+    }
     if (job.polls >= 3) return done(200, { status: "COMPLETED", text: "Uwesh Fruqui matud (mock transcription)" });
-    return done(200, { status: "IN_PROGRESS" });
+    return done(200, { status: "IN_PROGRESS", delayTime: 1200 });
   }
 
   done(404, { error: "Not found" });

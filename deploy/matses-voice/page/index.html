@@ -116,8 +116,10 @@ main > section { margin-block: auto; }
     <p class="hint">Gravando — para automaticamente em 3:00</p>
   </section>
   <section id="loading" hidden>
-    <div class="spinner" role="status" aria-label="Transcrevendo"></div>
+    <div class="spinner" aria-hidden="true"></div>
     <p class="timer" id="loadtimer">0:00</p>
+    <p class="hint" id="loadstage" role="status" aria-live="polite" aria-atomic="true"></p>
+    <p class="hint" id="loadstartup" hidden>Após um período sem uso, o serviço pode levar alguns minutos para iniciar.</p>
     <p class="hint">Transcrevendo — pode levar alguns minutos, pode ficar tranquilo</p>
     <p class="jobid" id="loadjob"></p>
     <button id="cancel" class="ghost">Cancelar</button>
@@ -164,13 +166,49 @@ function show(name) { for (const s of STATES) $(s).hidden = (s !== name); }
 let recorder = null, chunks = [], stream = null, busy = false;
 let autoStop = null, tick = null, seconds = 0;
 let pollTimer = null, jobDeadline = 0, jobId = null, pollGen = 0, pollFails = 0;
-let loadTick = null;
+let loadTick = null, loadStart = 0, currentStage = "";
 function fmt(s) { const n = Math.floor(s); return Math.floor(n / 60) + ":" + String(n % 60).padStart(2, "0"); }
 function cleanupMic() {
   if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
 }
-function fail(msg, job) {
+function loadTimerStop() {
   clearInterval(loadTick);
+  loadTick = null;
+}
+function loadTimerStart() {
+  loadTimerStop();
+  loadStart = performance.now();
+  $("loadtimer").textContent = "0:00";
+  loadTick = setInterval(() => {
+    const s = Math.floor((performance.now() - loadStart) / 1000);
+    $("loadtimer").textContent = fmt(s);
+  }, 1000);
+}
+function setStage(msg) {
+  if (msg === currentStage) return;
+  currentStage = msg;
+  $("loadstage").textContent = msg;
+  $("loadstartup").hidden = msg.indexOf("Na fila — aguardando processamento.") !== 0 && msg.indexOf("Processando o áudio") !== 0;
+}
+function renderJobStatus(job) {
+  const st = job && job.status;
+  if (st === "IN_QUEUE") { setStage("Na fila — aguardando processamento."); return; }
+  if (st === "IN_PROGRESS") {
+    let msg = "Processando o áudio...";
+    const d = job.delayTime;
+    if (typeof d === "number" && isFinite(d) && d >= 1000) {
+      msg += " (Tempo na fila: " + fmt(Math.floor(d / 1000)) + ")";
+    }
+    setStage(msg);
+    return;
+  }
+  if (st === "FAILED" || st === "CANCELLED" || st === "TIMED_OUT" || st === "COMPLETED") return;
+  setStage("Aguardando atualização...");
+}
+function fail(msg, job) {
+  loadTimerStop();
+  clearTimeout(pollTimer);
+  setStage("");
   busy = false;
   show("error");
   $("errmsg").textContent = msg;
@@ -211,8 +249,10 @@ $("rec").addEventListener("click", startRecording);
 $("stop").addEventListener("click", stopRecording);
 async function processRecording() {
   cleanupMic();
+  const gen = pollGen;
   show("loading");
-  $("loadtimer").textContent = "0:00";
+  loadTimerStart();
+  setStage("Preparando o áudio...");
   try {
     const blob = new Blob(chunks, { type: (recorder && recorder.mimeType) || "audio/webm" });
     if (!blob.size) throw new Error("Nada foi gravado. Tente de novo.");
@@ -235,6 +275,8 @@ async function processRecording() {
     const samples = rendered.getChannelData(0);
     const wav = encodeWav(samples, 16000);
     const b64 = bytesToBase64(new Uint8Array(wav));
+    if (gen !== pollGen) return;
+    setStage("Enviando o áudio...");
     $("loadjob").textContent = "";
     const resp = await fetch(WORKER_URL + "/run", {
       method: "POST",
@@ -248,11 +290,14 @@ async function processRecording() {
       throw new Error(m);
     }
     const job = await resp.json();
+    if (gen !== pollGen) return;
     if (!job.id) throw new Error("Servidor não retornou ID do job.");
     setJobId(job.id);
+    renderJobStatus(job);
     jobDeadline = Date.now() + POLL_DEADLINE_MS;
     pollLoop();
   } catch (e) {
+    if (gen !== pollGen) return;
     fail(e && e.message ? e.message : "Erro inesperado.");
   }
 }
@@ -266,12 +311,6 @@ function pollLoop() {
     fail("Tempo esgotado. Tente de novo.", jobId);
     return;
   }
-  clearInterval(loadTick);
-  const loadStart = Date.now();
-  loadTick = setInterval(() => {
-    const s = Math.floor((Date.now() - loadStart) / 1000);
-    $("loadtimer").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
-  }, 1000);
   const gen = pollGen;
   pollTimer = setTimeout(async () => {
     try {
@@ -282,7 +321,7 @@ function pollLoop() {
       if (gen !== pollGen) return;
       pollFails = 0;
       if (job.status === "COMPLETED") {
-        clearInterval(loadTick);
+        loadTimerStop();
         currentTranscript = job.text || "";
         if (currentTranscript) {
           renderChips(currentTranscript);
@@ -295,15 +334,17 @@ function pollLoop() {
         show("result");
         return;
       }
-      if (job.error) {
-        fail(job.error, jobId);
+      if (job.error || job.status === "FAILED" || job.status === "CANCELLED" || job.status === "TIMED_OUT") {
+        fail(job.error || job.status, jobId);
         return;
       }
+      renderJobStatus(job);
       pollLoop();
     } catch (e) {
       if (gen !== pollGen) return;
       pollFails += 1;
       if (pollFails >= 5) { fail("Sem conexão com o servidor. Tente de novo.", jobId); return; }
+      setStage("Não foi possível atualizar o andamento. Tentando de novo...");
       pollLoop();
     }
   }, POLL_MS);
@@ -545,10 +586,10 @@ function bytesToBase64(bytes) {
   return btoa(binary);
 }
 $("cancel").addEventListener("click", () => {
-  pollGen += 1; pollFails = 0; clearTimeout(pollTimer); busy = false; show("idle");
+  pollGen += 1; pollFails = 0; clearTimeout(pollTimer); loadTimerStop(); setStage(""); busy = false; show("idle");
 });
-$("restart").addEventListener("click", () => { pollGen += 1; fbGen += 1; pollFails = 0; busy = false; jobId = null; show("idle"); });
-$("retry").addEventListener("click", () => { pollGen += 1; fbGen += 1; pollFails = 0; busy = false; jobId = null; show("idle"); });
+$("restart").addEventListener("click", () => { pollGen += 1; fbGen += 1; pollFails = 0; clearTimeout(pollTimer); loadTimerStop(); setStage(""); busy = false; jobId = null; show("idle"); });
+$("retry").addEventListener("click", () => { pollGen += 1; fbGen += 1; pollFails = 0; clearTimeout(pollTimer); loadTimerStop(); setStage(""); busy = false; jobId = null; show("idle"); });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && recorder && recorder.state === "recording") stopRecording();
 });

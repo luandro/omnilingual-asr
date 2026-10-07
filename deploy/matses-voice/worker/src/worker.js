@@ -90,6 +90,15 @@ async function persistRun(env, profId, jobId, audioB64) {
   }
 }
 
+// Forward queue timing only when it is a finite, nonnegative number.
+// delayTime is the time the job spent in queue before pickup; it says nothing
+// about model startup or inference, so it is exposed as-is and never derived from.
+function safeDelayTime(job) {
+  const d = job.delayTime;
+  if (typeof d !== "number" || !Number.isFinite(d) || d < 0) return undefined;
+  return d;
+}
+
 async function statusUpstream(env, request, profId, jobId) {
   const prof = PROFILES[profId];
   const upstream = await fetch(RUNPOD_BASE + prof.endpointId + "/status/" + jobId, {
@@ -117,7 +126,10 @@ async function statusUpstream(env, request, profId, jobId) {
   if (["FAILED", "CANCELLED", "TIMED_OUT"].includes(jobStatus)) {
     return json(env, request, { status: jobStatus, error: job.error || jobStatus });
   }
-  return json(env, request, { status: jobStatus });
+  const out = { status: jobStatus };
+  const delayTime = safeDelayTime(job);
+  if (delayTime !== undefined) out.delayTime = delayTime;
+  return json(env, request, out);
 }
 
 export default {
